@@ -1,0 +1,30 @@
+seed: 42
+
+paths:
+  features: data/features.parquet
+  labels: data/labels.parquet
+  model: models/pipeline.joblib
+
+# Months are inclusive. 2016 is dropped (a few hundred orders).
+split:
+  start: '2017-01'
+  train_end: '2017-11'    # train: 2017-01 .. 2017-11
+  val_end: '2018-01'      # val:   2017-12 .. 2018-01 (threshold)
+  test_end: '2018-03'     # test:  2018-02 .. 2018-03
+  batches_end: '2018-08'  # batches: 2018-04 .. 2018-08
+
+seller_k: 5
+min_category_freq: 500
+
+# Filled once by the Optuna cell in tree_classification.ipynb.
+best_params:
+  n_estimators: 200
+  learning_rate: 0.051551227534050184
+  num_leaves: 16
+  max_depth: 4
+  min_child_samples: 35
+  subsample: 0.6006255648330673
+  colsample_bytree: 0.794725035140069
+  subsample_freq: 1
+  scale_pos_weight: 17.5666
+threshold: 0.405
