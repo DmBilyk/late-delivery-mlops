@@ -4,6 +4,8 @@ paths:
   features: data/features.parquet
   labels: data/labels.parquet
   model: models/pipeline.joblib
+  batches_dir: batches
+  labels_dir: labels
 
 # Months are inclusive. 2016 is dropped (a few hundred orders).
 split:
@@ -28,3 +30,5 @@ best_params:
   subsample_freq: 1
   scale_pos_weight: 17.5666
 threshold: 0.405
+
+
