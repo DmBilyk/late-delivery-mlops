@@ -22,6 +22,10 @@ from src.features import build_pipeline
 from src.metrics import evaluate
 from src.schema import ID_COLUMN, INPUT_COLUMNS, TARGET_COLUMN, TIMESTAMP_COLUMN
 from src.split import assign_split
+from src.mlflow_logger import log_experiment
+
+
+
 
 
 def load_config(path):
@@ -73,6 +77,8 @@ def main():
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, model_path)
     (model_path.parent / 'metrics.json').write_text(json.dumps(metrics, indent=2))
+
+    log_experiment(args.config, str(model_path.parent / 'metrics.json'), str(model_path))
 
     for name, values in metrics.items():
         print(f'{name:5s} ' + '  '.join(f'{k}={v:.3f}' for k, v in values.items()))
