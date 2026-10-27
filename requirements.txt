@@ -13,3 +13,5 @@ six==1.17.0
 threadpoolctl==3.7.0
 mlflow==3.17.2
 pytest==9.1.1
+psycopg==3.3.6
+psycopg-binary==3.3.6
