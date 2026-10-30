@@ -9,11 +9,80 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # First start only: extra databases, then tables and views in `ml`
+      - ./docker/postgres/10-databases.sql:/docker-entrypoint-initdb.d/10-databases.sql:ro
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/20-schema.sql:ro
+      - ./sql/views.sql:/docker-entrypoint-initdb.d/30-views.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ml -d ml"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  mlflow:
+    build: docker/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --workers 1
+      --backend-store-uri postgresql+psycopg://ml:ml@postgres:5432/mlflow
+      --artifacts-destination /mlartifacts
+      --allowed-hosts mlflow,mlflow:5000,localhost,localhost:5001,127.0.0.1,127.0.0.1:5001
+    environment:
+      # Background job runner is for GenAI features we don't use; it costs ~1.4 GB of RAM
+      MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
+    ports:
+      - "127.0.0.1:5001:5000"
+    volumes:
+      - mlartifacts:/mlartifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  airflow:
+    build:
+      context: .
+      dockerfile: docker/airflow/Dockerfile
+    command: standalone
+    environment:
+      # Airflow itself: metadata in the `airflow` database, tasks run as local processes
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://ml:ml@postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      # No login locally: the port is bound to 127.0.0.1 (on EC2: SSH tunnel only)
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+      # Our tasks: where the project, MLflow and the `ml` database are
+      PROJECT_DIR: /opt/project
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DATABASE_URL: postgresql://ml:ml@postgres:5432/ml
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      # Whole project read-only (a single-file mount goes stale after edits), data folders writable
+      - .:/opt/project:ro
+      - ./batches:/opt/project/batches
+      - ./labels:/opt/project/labels
+      - ./predictions:/opt/project/predictions
+      - airflow-logs:/opt/airflow/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
 volumes:
   pgdata:
+  mlartifacts:
+  airflow-logs:

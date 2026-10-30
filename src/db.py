@@ -97,6 +97,26 @@ def save_prediction(conn, order_id, purchase_timestamp, model_version, p_late, t
 
 
 @_db_errors
+def fetch_monthly_metrics(conn):
+    """Rows of v_monthly_metrics as plain dicts (month as 'YYYY-MM', metrics as float or None)."""
+    rows = conn.execute(
+        'SELECT month, model_version, n_predictions, n_with_actuals, recall_late, precision_late '
+        'FROM v_monthly_metrics ORDER BY month'
+    ).fetchall()
+    return [
+        {
+            'month': month.strftime('%Y-%m'),
+            'model_version': model_version,
+            'n_predictions': n_predictions,
+            'n_with_actuals': n_with_actuals,
+            'recall_late': None if recall is None else float(recall),
+            'precision_late': None if precision is None else float(precision),
+        }
+        for month, model_version, n_predictions, n_with_actuals, recall, precision in rows
+    ]
+
+
+@_db_errors
 def save_actuals(conn, month, df):
     """df has order_id and is_late; month is the purchase month of the labels file."""
     rows = [

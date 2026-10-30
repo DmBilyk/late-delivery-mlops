@@ -6,6 +6,7 @@ paths:
   model: models/pipeline.joblib
   batches_dir: batches
   labels_dir: labels
+  predictions_dir: predictions
 
 # Months are inclusive. 2016 is dropped (a few hundred orders).
 split:

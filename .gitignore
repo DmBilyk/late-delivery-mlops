@@ -7,3 +7,4 @@ mlflow.db
 mlruns/
 batches/
 labels/
+predictions/
