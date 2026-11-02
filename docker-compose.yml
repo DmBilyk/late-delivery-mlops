@@ -1,11 +1,14 @@
+# Database settings come from .env (see .env.example); the defaults are for the local postgres container.
+# DB_HOST, DB_USER, DB_PASSWORD, DB_SSLMODE are shared by mlflow, airflow, api and grafana.
+
 services:
   postgres:
     image: postgres:16
     restart: unless-stopped
     environment:
       POSTGRES_DB: ml
-      POSTGRES_USER: ml
-      POSTGRES_PASSWORD: ml
+      POSTGRES_USER: ${DB_USER:-ml}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ml}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -15,7 +18,7 @@ services:
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/20-schema.sql:ro
       - ./sql/views.sql:/docker-entrypoint-initdb.d/30-views.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ml -d ml"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d ml"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -28,12 +31,13 @@ services:
       --host 0.0.0.0
       --port 5000
       --workers 1
-      --backend-store-uri postgresql+psycopg://ml:ml@postgres:5432/mlflow
-      --artifacts-destination /mlartifacts
+      --backend-store-uri postgresql+psycopg://${DB_USER:-ml}:${DB_PASSWORD:-ml}@${DB_HOST:-postgres}:5432/mlflow?sslmode=${DB_SSLMODE:-disable}
+      --artifacts-destination ${MLFLOW_ARTIFACTS:-/mlartifacts}
       --allowed-hosts mlflow,mlflow:5000,localhost,localhost:5001,127.0.0.1,127.0.0.1:5001
     environment:
       # Background job runner is for GenAI features we don't use; it costs ~1.4 GB of RAM
       MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
+      AWS_DEFAULT_REGION: ${AWS_REGION:-eu-central-1}
     ports:
       - "127.0.0.1:5001:5000"
     volumes:
@@ -55,7 +59,7 @@ services:
     restart: unless-stopped
     environment:
       # Airflow itself: metadata in the `airflow` database, tasks run as local processes
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://ml:ml@postgres:5432/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${DB_USER:-ml}:${DB_PASSWORD:-ml}@${DB_HOST:-postgres}:5432/airflow?sslmode=${DB_SSLMODE:-disable}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       # No login locally: the port is bound to 127.0.0.1 (on EC2: SSH tunnel only)
@@ -63,7 +67,10 @@ services:
       # Our tasks: where the project, MLflow and the `ml` database are
       PROJECT_DIR: /opt/project
       MLFLOW_TRACKING_URI: http://mlflow:5000
-      DATABASE_URL: postgresql://ml:ml@postgres:5432/ml
+      DATABASE_URL: postgresql://${DB_USER:-ml}:${DB_PASSWORD:-ml}@${DB_HOST:-postgres}:5432/ml?sslmode=${DB_SSLMODE:-disable}
+      # Empty locally: predictions stay in ./predictions only
+      PREDICTIONS_BUCKET: ${PREDICTIONS_BUCKET:-}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-eu-central-1}
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
@@ -91,7 +98,7 @@ services:
     restart: unless-stopped
     environment:
       MLFLOW_TRACKING_URI: http://mlflow:5000
-      DATABASE_URL: postgresql://ml:ml@postgres:5432/ml
+      DATABASE_URL: postgresql://${DB_USER:-ml}:${DB_PASSWORD:-ml}@${DB_HOST:-postgres}:5432/ml?sslmode=${DB_SSLMODE:-disable}
     ports:
       - "127.0.0.1:8000:8000"
     # Not on postgres: the API must start and answer 503 when the database is down
@@ -110,11 +117,11 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      # Used by provisioning/datasources/ml.yaml; on EC2 point these at RDS (sslmode=require)
-      ML_DB_HOST: postgres:5432
-      ML_DB_USER: ml
-      ML_DB_PASSWORD: ml
-      ML_DB_SSLMODE: disable
+      # Used by provisioning/datasources/ml.yaml
+      ML_DB_HOST: ${DB_HOST:-postgres}:5432
+      ML_DB_USER: ${DB_USER:-ml}
+      ML_DB_PASSWORD: ${DB_PASSWORD:-ml}
+      ML_DB_SSLMODE: ${DB_SSLMODE:-disable}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

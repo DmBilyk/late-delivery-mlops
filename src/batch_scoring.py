@@ -1,6 +1,8 @@
 """Steps of the monthly batch DAG. Plain functions, no Airflow imports, so they run in the ML venv."""
+import os
 from pathlib import Path
 
+import boto3
 import mlflow
 import pandas as pd
 import yaml
@@ -52,6 +54,17 @@ def write_predictions_file(scored, month, cfg):
     return path
 
 
+def upload_predictions(path, month):
+    """Copies the file to s3://$PREDICTIONS_BUCKET/predictions/<month>.parquet. No bucket set (local) -> skip."""
+    bucket = os.environ.get('PREDICTIONS_BUCKET')
+    if not bucket:
+        return None
+    key = f'predictions/{month}.parquet'
+    # Credentials come from the EC2 instance role, no keys in the code or env.
+    boto3.client('s3').upload_file(str(path), bucket, key)
+    return f's3://{bucket}/{key}'
+
+
 def score_batch(month, cfg):
     """Scores the batch with the current champion and writes predictions to a file and Postgres."""
     version = champion_version()
@@ -71,13 +84,14 @@ def score_batch(month, cfg):
                           run_id=run_id, model_version=version, threshold=threshold),
             month, cfg,
         )
+        s3_uri = upload_predictions(path, month)
         n_rows = save_predictions(conn, run_id, scored, version, threshold)
         finish_batch_run(conn, run_id, 'success', n_rows=n_rows)
     except Exception as e:
         finish_batch_run(conn, run_id, 'failed', error=str(e))
         raise
 
-    print(f'{month}: run {run_id}, model v{version}, {n_rows} predictions -> {path} + postgres')
+    print(f'{month}: run {run_id}, model v{version}, {n_rows} predictions -> {s3_uri or path} + postgres')
     return {'run_id': run_id, 'model_version': version, 'n_rows': n_rows}
 
 

@@ -105,3 +105,15 @@ def test_api_prediction_has_no_batch_run(conn):
 def test_unreachable_database_raises_clean_error():
     with pytest.raises(DatabaseUnavailable):
         get_connection('postgresql://ml:ml@127.0.0.1:1/ml')
+
+
+def test_init_db_can_run_twice(test_db):
+    from src.init_db import apply_schema, create_databases
+
+    apply_schema(test_db)  # tables and views already exist: must not fail
+    create_databases(test_db, names=['init_test'])
+    create_databases(test_db, names=['init_test'])  # second run: already exists
+    exists = test_db.execute("SELECT 1 FROM pg_database WHERE datname = 'init_test'").fetchone()
+    test_db.execute('DROP DATABASE init_test')
+
+    assert exists

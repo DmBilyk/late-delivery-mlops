@@ -1,0 +1,18 @@
+# EC2 overrides: databases live in RDS, so the postgres container is not started.
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Everything else (RDS host, SSL, S3 bucket, passwords) comes from .env.
+
+services:
+  postgres:
+    profiles: ["local-db"]
+
+  mlflow:
+    depends_on: !reset {}
+
+  airflow:
+    depends_on: !override
+      mlflow:
+        condition: service_healthy
+
+  grafana:
+    depends_on: !reset {}
