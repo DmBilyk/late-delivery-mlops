@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ml
       POSTGRES_USER: ml
@@ -21,6 +22,7 @@ services:
 
   mlflow:
     build: docker/mlflow
+    restart: unless-stopped
     command: >
       mlflow server
       --host 0.0.0.0
@@ -50,6 +52,7 @@ services:
       context: .
       dockerfile: docker/airflow/Dockerfile
     command: standalone
+    restart: unless-stopped
     environment:
       # Airflow itself: metadata in the `airflow` database, tasks run as local processes
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://ml:ml@postgres:5432/airflow
@@ -82,7 +85,49 @@ services:
       timeout: 5s
       retries: 20
 
+  api:
+    build: .
+    command: uvicorn src.api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DATABASE_URL: postgresql://ml:ml@postgres:5432/ml
+    ports:
+      - "127.0.0.1:8000:8000"
+    # Not on postgres: the API must start and answer 503 when the database is down
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:13.2.5
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Used by provisioning/datasources/ml.yaml; on EC2 point these at RDS (sslmode=require)
+      ML_DB_HOST: postgres:5432
+      ML_DB_USER: ml
+      ML_DB_PASSWORD: ml
+      ML_DB_SSLMODE: disable
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # Datasource, dashboards and alerts live in the repo; the volume keeps only runtime state
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
   mlartifacts:
   airflow-logs:
+  grafana-data:

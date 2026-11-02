@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: ml
+    uid: ml-postgres
+    type: grafana-postgresql-datasource
+    url: ${ML_DB_HOST}
+    user: ${ML_DB_USER}
+    isDefault: true
+    editable: false
+    jsonData:
+      database: ml
+      sslmode: ${ML_DB_SSLMODE}
+      postgresVersion: 1600
+    secureJsonData:
+      password: ${ML_DB_PASSWORD}

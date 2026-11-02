@@ -1,0 +1,75 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: late-delivery
+    folder: Late delivery
+    interval: 1m
+    rules:
+      # Recall of the latest month with labels is below 0.45 (normal range is ~0.5-0.8).
+      - uid: recall-dropped
+        title: Recall dropped
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: ml-postgres
+            model:
+              refId: A
+              format: table
+              rawQuery: true
+              editorMode: code
+              rawSql: >
+                SELECT recall_late::float AS recall
+                FROM v_monthly_metrics
+                WHERE recall_late IS NOT NULL
+                ORDER BY month DESC
+                LIMIT 1
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [0.45] }
+        noDataState: OK
+        execErrState: Error
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Recall of the latest labelled month is {{ $values.A }}; check the champion and roll back if needed.
+
+      # No successful batch run for 35 days (batches are monthly).
+      - uid: batch-missing
+        title: Expected batch did not arrive
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: ml-postgres
+            model:
+              refId: A
+              format: table
+              rawQuery: true
+              editorMode: code
+              rawSql: >
+                SELECT coalesce(extract(epoch FROM now() - max(finished_at)) / 3600, 1e6)::float AS hours
+                FROM batch_runs
+                WHERE status = 'success'
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [840] }
+        noDataState: Alerting
+        execErrState: Error
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Last successful batch finished {{ $values.A }} hours ago; check the batch folder and the Airflow sensor.

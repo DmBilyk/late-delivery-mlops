@@ -2,4 +2,10 @@
 .idea/
 .venv/
 __pycache__/
+.pytest_cache/
 models/
+mlruns/
+mlflow.db
+batches/
+labels/
+predictions/
