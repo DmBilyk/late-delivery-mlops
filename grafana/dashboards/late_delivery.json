@@ -1,0 +1,199 @@
+{
+  "uid": "late-delivery",
+  "title": "Late delivery model",
+  "tags": ["mlops"],
+  "timezone": "utc",
+  "schemaVersion": 41,
+  "refresh": "1m",
+  "time": { "from": "now-7d", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "month",
+        "label": "Month",
+        "type": "query",
+        "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+        "query": "SELECT DISTINCT to_char(month, 'YYYY-MM') FROM v_prediction_distribution ORDER BY 1 DESC",
+        "refresh": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Model version (last batch)",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT model_version AS version FROM batch_runs WHERE status = 'success' ORDER BY finished_at DESC LIMIT 1"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Hours since last successful batch",
+      "description": "Alert fires after 35 days (840 h) without a new batch.",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT round(extract(epoch FROM now() - max(finished_at)) / 3600) AS hours FROM batch_runs WHERE status = 'success'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 840 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed / stuck batch runs",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS failures FROM v_batch_failures"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "API requests (time range)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS requests FROM predictions WHERE source = 'api' AND $__timeFilter(predicted_at)"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none" }
+    },
+    {
+      "id": 5,
+      "type": "barchart",
+      "title": "Recall and precision by month",
+      "description": "Latest run per month, on orders whose labels have arrived. Recall alert threshold: 0.45.",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 9 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT to_char(month, 'YYYY-MM') AS month, recall_late::float AS recall, precision_late::float AS precision FROM v_monthly_metrics WHERE recall_late IS NOT NULL ORDER BY month"
+        }
+      ],
+      "fieldConfig": { "defaults": { "min": 0, "max": 1, "decimals": 2 } },
+      "options": { "xField": "month", "showValue": "auto", "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "p_late distribution ($month)",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 9 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT to_char(bucket_from, 'FM0.0') AS p_late_from, n_predictions FROM v_prediction_distribution WHERE month = to_date('$month', 'YYYY-MM') ORDER BY bucket"
+        }
+      ],
+      "options": { "xField": "p_late_from", "showValue": "auto", "legend": { "showLegend": false } }
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Monthly metrics",
+      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 7 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT to_char(month, 'YYYY-MM') AS month, model_version, n_predictions, n_with_actuals, n_late, n_predicted_late, n_true_positive, recall_late, precision_late, actual_late_rate FROM v_monthly_metrics ORDER BY month DESC"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Batch failures",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT run_id, to_char(month, 'YYYY-MM') AS month, status, error, started_at FROM v_batch_failures LIMIT 50"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "API requests per hour",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "ml-postgres" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroupAlias(predicted_at, '1h', 0), count(*) AS requests FROM predictions WHERE source = 'api' AND $__timeFilter(predicted_at) GROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60 } } }
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+#!/bin/bash
+# EC2 first boot: Docker, a non-root user with SSH key login only, the project,
+# and a systemd unit that rebuilds .env from SSM and starts Compose on every boot.
+# Log: /var/log/user-data.log   Stack: journalctl -u app
+set -euxo pipefail
+exec > /var/log/user-data.log 2>&1
+
+APP_USER=mlops
+APP_DIR=/opt/app
+
+# 1. Docker with the Compose plugin, git, AWS CLI
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2 git
+snap install aws-cli --classic
+systemctl enable --now docker
+
+# 2. Non-root user in the docker group, same SSH key as the default ubuntu user
+useradd --create-home --shell /bin/bash --groups docker "$APP_USER"
+install -d -m 700 -o "$APP_USER" -g "$APP_USER" "/home/$APP_USER/.ssh"
+install -m 600 -o "$APP_USER" -g "$APP_USER" /home/ubuntu/.ssh/authorized_keys "/home/$APP_USER/.ssh/authorized_keys"
+cat > /etc/ssh/sshd_config.d/10-hardening.conf <<'EOF'
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+EOF
+systemctl try-reload-or-restart ssh
+
+# 3. Project code
+git clone --branch ${repo_branch} ${repo_url} "$APP_DIR"
+chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+# Written by containers with different users (airflow 50000, api 1000)
+install -d -m 777 "$APP_DIR/batches" "$APP_DIR/labels" "$APP_DIR/predictions"
+
+# 4. .env from SSM Parameter Store; runs before every start, so new values are picked up on reboot
+cat > /usr/local/bin/app-env <<'EOF'
+#!/bin/bash
+set -euo pipefail
+p() { /snap/bin/aws ssm get-parameter --region ${region} --name "${ssm_prefix}/$1" --with-decryption --query Parameter.Value --output text; }
+BUCKET=$(p bucket)
+umask 077
+cat > /opt/app/.env <<ENV
+COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+DB_HOST=$(p db_host)
+DB_USER=ml
+DB_PASSWORD=$(p db_password)
+DB_SSLMODE=require
+MLFLOW_ARTIFACTS=s3://$BUCKET/mlartifacts
+PREDICTIONS_BUCKET=$BUCKET
+AWS_REGION=${region}
+GRAFANA_ADMIN_PASSWORD=$(p grafana_admin_password)
+ENV
+chown mlops:mlops /opt/app/.env
+EOF
+chmod 755 /usr/local/bin/app-env
+
+# 5. Compose on boot: .env -> build -> databases/tables/views on RDS -> up
+cat > /etc/systemd/system/app.service <<'EOF'
+[Unit]
+Description=late-delivery stack (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/app
+ExecStartPre=/usr/local/bin/app-env
+ExecStartPre=/usr/bin/docker compose build
+ExecStartPre=/usr/bin/docker compose run --rm --no-deps api python -m src.init_db
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable app.service
+# --no-block: the first build takes ~10 min, user data should not wait for it
+systemctl start --no-block app.service

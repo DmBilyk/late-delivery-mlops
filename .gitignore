@@ -9,3 +9,7 @@ batches/
 labels/
 predictions/
 .env
+terraform/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
