@@ -13,3 +13,4 @@ terraform/.terraform/
 *.tfstate
 *.tfstate.*
 terraform.tfvars
+tfplan

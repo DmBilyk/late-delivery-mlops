@@ -1,6 +1,7 @@
 variable "region" {
-  type    = string
-  default = "eu-central-1"
+  description = "This AWS account only allows eu-north-1 (other regions are denied by an organization policy)"
+  type        = string
+  default     = "eu-north-1"
 }
 
 variable "project" {
