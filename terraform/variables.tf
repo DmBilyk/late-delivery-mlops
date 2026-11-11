@@ -1,5 +1,4 @@
 variable "region" {
-  description = "This AWS account only allows eu-north-1 (other regions are denied by an organization policy)"
   type        = string
   default     = "eu-north-1"
 }
@@ -10,7 +9,6 @@ variable "project" {
 }
 
 variable "allowed_ssh_cidr" {
-  description = "Your public IP for SSH, e.g. 203.0.113.10/32 (curl -s ifconfig.me)"
   type        = string
 }
 
@@ -20,7 +18,6 @@ variable "ssh_public_key_path" {
 }
 
 variable "instance_type" {
-  description = "The stack needs ~3 GB RAM. AWS Free plan accounts: use m7i-flex.large or c7i-flex.large"
   type        = string
   default     = "t3.medium"
 }
@@ -46,12 +43,10 @@ variable "budget_limit_usd" {
 }
 
 variable "budget_email" {
-  description = "Where budget alerts are sent"
   type        = string
 }
 
 variable "force_destroy_bucket" {
-  description = "Allow terraform destroy to delete a non-empty bucket. Keep false so history survives."
   type        = bool
   default     = false
 }

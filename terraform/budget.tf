@@ -1,4 +1,3 @@
-# Monthly cost alert by email. Credits are excluded, so the alert shows real usage even while credits pay for it.
 resource "aws_budgets_budget" "monthly" {
   name         = "${var.project}-monthly"
   budget_type  = "COST"

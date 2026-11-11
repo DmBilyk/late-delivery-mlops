@@ -1,4 +1,6 @@
-# EC2 instance role: no access keys anywhere, boto3 and the AWS CLI get temporary credentials from it.
+
+
+
 resource "aws_iam_role" "ec2" {
   name = "${var.project}-ec2"
 

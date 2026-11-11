@@ -1,4 +1,3 @@
-"""Steps of the monthly batch DAG. Plain functions, no Airflow imports, so they run in the ML venv."""
 import os
 from pathlib import Path
 

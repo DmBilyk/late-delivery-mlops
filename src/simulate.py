@@ -14,7 +14,7 @@ import yaml
 from src.schema import ID_COLUMN, TARGET_COLUMN, TIMESTAMP_COLUMN
 from src.split import assign_split
 
-# Labels for month M arrive together with the batch of month M + LABEL_DELAY.
+
 LABEL_DELAY = 1
 
 
@@ -34,7 +34,7 @@ def select_month(df, month, split_cfg):
 
 
 def batch_months(split_cfg):
-    """All batch months in order: ['2018-04', ..., '2018-08']."""
+
     first = pd.Period(split_cfg['test_end'], 'M') + 1
     last = pd.Period(split_cfg['batches_end'], 'M')
     return [str(month) for month in pd.period_range(first, last, freq='M')]
@@ -68,7 +68,7 @@ def write_labels(df, month, cfg, force=False):
 
 
 def next_step(df, cfg):
-    """One tick of time: the next missing batch plus the labels that are due by then."""
+
     months = batch_months(cfg['split'])
     batches_dir = Path(cfg['paths']['batches_dir'])
     labels_dir = Path(cfg['paths']['labels_dir'])
@@ -79,7 +79,7 @@ def next_step(df, cfg):
         write_batch(df, month, cfg)
         due = months[:months.index(month) + 1 - LABEL_DELAY]
     else:
-        # All batches are out: the remaining labels arrive one per tick.
+
         due = months
 
     missing = [m for m in due if not (labels_dir / f'{m}.parquet').exists()]
@@ -90,7 +90,7 @@ def next_step(df, cfg):
 
 
 def parse_rename(value):
-    """'old=new' -> {'old': 'new'}"""
+
     old, new = value.split('=')
     return {old: new}
 

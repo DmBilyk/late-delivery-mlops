@@ -24,7 +24,7 @@ CATEGORICAL_COLUMNS = [
     'seller_state',
 ]
 
-# Raw columns a batch must contain (no dummies, no derived features).
+
 INPUT_COLUMNS = {
     **{col: 'numeric' for col in NUMERIC_COLUMNS},
     **{col: 'categorical' for col in CATEGORICAL_COLUMNS},
@@ -32,7 +32,7 @@ INPUT_COLUMNS = {
     TIMESTAMP_COLUMN: 'datetime',
 }
 
-# Known only after purchase: their presence in a batch means leakage.
+
 FORBIDDEN_COLUMNS = [
     'order_delivered_carrier_date',
     'order_delivered_customer_date',

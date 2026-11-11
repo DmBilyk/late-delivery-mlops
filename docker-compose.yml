@@ -1,5 +1,3 @@
-# Database settings come from .env (see .env.example); the defaults are for the local postgres container.
-# DB_HOST, DB_USER, DB_PASSWORD, DB_SSLMODE are shared by mlflow, airflow, api and grafana.
 
 services:
   postgres:
@@ -13,7 +11,7 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # First start only: extra databases, then tables and views in `ml`
+
       - ./docker/postgres/10-databases.sql:/docker-entrypoint-initdb.d/10-databases.sql:ro
       - ./sql/schema.sql:/docker-entrypoint-initdb.d/20-schema.sql:ro
       - ./sql/views.sql:/docker-entrypoint-initdb.d/30-views.sql:ro
@@ -35,7 +33,7 @@ services:
       --artifacts-destination ${MLFLOW_ARTIFACTS:-/mlartifacts}
       --allowed-hosts mlflow,mlflow:5000,localhost,localhost:5001,127.0.0.1,127.0.0.1:5001
     environment:
-      # Background job runner is for GenAI features we don't use; it costs ~1.4 GB of RAM
+
       MLFLOW_SERVER_ENABLE_JOB_EXECUTION: "false"
       AWS_DEFAULT_REGION: ${AWS_REGION:-eu-central-1}
     ports:
@@ -58,24 +56,24 @@ services:
     command: standalone
     restart: unless-stopped
     environment:
-      # Airflow itself: metadata in the `airflow` database, tasks run as local processes
+
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${DB_USER:-ml}:${DB_PASSWORD:-ml}@${DB_HOST:-postgres}:5432/airflow?sslmode=${DB_SSLMODE:-disable}
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
-      # No login locally: the port is bound to 127.0.0.1 (on EC2: SSH tunnel only)
+
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
-      # Our tasks: where the project, MLflow and the `ml` database are
+
       PROJECT_DIR: /opt/project
       MLFLOW_TRACKING_URI: http://mlflow:5000
       DATABASE_URL: postgresql://${DB_USER:-ml}:${DB_PASSWORD:-ml}@${DB_HOST:-postgres}:5432/ml?sslmode=${DB_SSLMODE:-disable}
-      # Empty locally: predictions stay in ./predictions only
+
       PREDICTIONS_BUCKET: ${PREDICTIONS_BUCKET:-}
       AWS_DEFAULT_REGION: ${AWS_REGION:-eu-central-1}
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./dags:/opt/airflow/dags
-      # Whole project read-only (a single-file mount goes stale after edits), data folders writable
+
       - .:/opt/project:ro
       - ./batches:/opt/project/batches
       - ./labels:/opt/project/labels

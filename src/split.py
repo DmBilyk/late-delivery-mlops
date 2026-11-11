@@ -2,10 +2,7 @@ import pandas as pd
 
 
 def assign_split(timestamps, split_cfg):
-    """Maps each purchase timestamp to train / val / test / batch by month (bounds inclusive).
 
-    Months outside [start, batches_end] get None and are not used.
-    """
     month = pd.to_datetime(timestamps).dt.to_period('M')
     bounds = {key: pd.Period(value, 'M') for key, value in split_cfg.items()}
 

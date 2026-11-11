@@ -1,6 +1,3 @@
-# One public subnet for EC2 (internet via the Internet Gateway, no NAT Gateway),
-# two private subnets for RDS (a DB subnet group needs two AZs). Private subnets have no route out.
-
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true

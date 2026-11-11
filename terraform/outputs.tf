@@ -2,12 +2,16 @@ output "ec2_public_ip" {
   value = aws_instance.app.public_ip
 }
 
+output "instance_id" {
+  value = aws_instance.app.id
+}
+
 output "ssh" {
   value = "ssh mlops@${aws_instance.app.public_ip}"
 }
 
 output "tunnel" {
-  description = "Then open localhost:8080 (Airflow), :5001 (MLflow), :3000 (Grafana), :8000 (API)"
+  description = "localhost:8080 (Airflow), :5001 (MLflow), :3000 (Grafana), :8000 (API)"
   value       = "ssh -N -L 8080:localhost:8080 -L 5001:localhost:5001 -L 3000:localhost:3000 -L 8000:localhost:8000 mlops@${aws_instance.app.public_ip}"
 }
 

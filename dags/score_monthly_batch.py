@@ -1,6 +1,4 @@
-"""Monthly batch scoring: wait for the batch file -> validate schema -> score with the champion
--> load the labels that have arrived -> print monthly metrics.
-
+"""
 One DAG run = one batch month (2018-04 .. 2018-08). The month comes from the run's
 logical date, or from the `month` param when triggered by hand (backfill of one month).
 """
@@ -29,9 +27,6 @@ def wait_for_batch(month):
     print(f'waiting for {path}')
     return path.exists()
 
-
-# The tasks below run in the ML venv: only the function body is shipped there,
-# so all imports live inside the function.
 
 @task.external_python(python=ML_PYTHON, expect_airflow=False, retries=0)
 def validate(month):

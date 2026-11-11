@@ -1,6 +1,6 @@
 # EC2 overrides: databases live in RDS, so the postgres container is not started.
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-# Everything else (RDS host, SSL, S3 bucket, passwords) comes from .env.
+
+
 
 services:
   postgres:
@@ -9,7 +9,6 @@ services:
   mlflow:
     depends_on: !reset {}
     environment:
-      # Without this MLflow signs S3 URLs for the global endpoint, which answers 307 for non-us-east-1 buckets
       MLFLOW_S3_ENDPOINT_URL: https://s3.${AWS_REGION}.amazonaws.com
 
   airflow:

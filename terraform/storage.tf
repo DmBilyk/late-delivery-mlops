@@ -19,7 +19,7 @@ resource "aws_s3_bucket_public_access_block" "data" {
 # RDS: databases ml (created here), mlflow and airflow (created by src.init_db on first boot).
 resource "random_password" "db" {
   length  = 24
-  special = false # the password goes into connection URLs
+  special = false
 }
 
 resource "aws_db_subnet_group" "main" {

@@ -1,9 +1,3 @@
-"""Online scoring API.
-
-    uvicorn src.api:app --host 0.0.0.0 --port 8000
-
-The champion is loaded once at startup; restart the service after `registry promote/rollback`.
-"""
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
